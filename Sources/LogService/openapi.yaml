@@ -43,6 +43,7 @@ paths:
                   deviceID: "device-456"
                   message: "User opened paywall"
                   action: "paywall_opened"
+                  source: "Function: paywallOpened, line: 38"
                   creationDate: "2025-04-05T18:30:00Z"
                   appVersion: "1.4.2"
                   deviceType: "iPhone16,2"
@@ -58,6 +59,7 @@ paths:
                     deviceID: "device-456"
                     message: "User opened paywall"
                     action: "paywall_opened"
+                    source: "Function: paywallOpened, line: 38"
                     creationDate: "2025-04-05T18:30:00Z"
                     appVersion: "1.4.2"
                     deviceType: "iPhone16,2"
@@ -70,6 +72,7 @@ paths:
                     deviceID: "device-456"
                     message: "Subscription button tapped"
                     action: "subscription_tapped"
+                    source: "Function: subscriptionTapped, line: 52"
                     creationDate: "2025-04-05T18:30:05Z"
                     appVersion: "1.4.2"
                     deviceType: "iPhone16,2"
@@ -230,6 +233,7 @@ components:
         - sessionID
         - deviceID
         - action
+        - source
         - creationDate
         - appVersion
         - deviceType
@@ -255,6 +259,10 @@ components:
         action:
           type: string
           example: "paywall_opened"
+        source:
+          type: string
+          description: Address of where the log was captured.
+          example: "Function: foo, line: 38"
         creationDate:
           description: ISO-8601 string.
           type: string
@@ -286,6 +294,7 @@ components:
         - sessionID
         - deviceID
         - action
+        - source
         - creationDate
         - appVersion
         - deviceType
@@ -311,6 +320,10 @@ components:
         action:
           type: string
           example: "paywall_opened"
+        source:
+          type: string
+          description: Address of where the log was captured.
+          example: "Function: foo, line: 38"
         creationDate:
           type: string
           format: date-time
