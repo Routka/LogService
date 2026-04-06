@@ -30,6 +30,10 @@ let package = Package(
                             .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator"),
                         ]
         ),
+        .testTarget(
+            name: "LogServiceTests",
+            dependencies: ["LogService"]
+        ),
 
     ]
 )

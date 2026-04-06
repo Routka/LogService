@@ -256,15 +256,10 @@ components:
           type: string
           example: "paywall_opened"
         creationDate:
-          description: ISO-8601 string, Unix timestamp in seconds, or Unix timestamp in milliseconds.
-          oneOf:
-            - type: string
-              format: date-time
-              example: "2025-04-05T18:30:00.123Z"
-            - type: number
-              example: 1743877800
-            - type: integer
-              example: 1743877800000
+          description: ISO-8601 string.
+          type: string
+          format: date-time
+          example: "2025-04-05T18:30:00.123Z"
         appVersion:
           type: string
           example: "1.4.2"

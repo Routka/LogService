@@ -266,6 +266,11 @@ public struct LogServiceClient: LogServiceClientProtocol {
         return url
     }
 
+    func encodeForCreateLogRequest(_ log: CreateAppLogRequest) throws -> Data {
+        let generatedLog = try bridge(log, to: Components.Schemas.CreateAppLog.self)
+        return try makeEncoder().encode(generatedLog)
+    }
+
     private func bridge<Input: Encodable, Output: Decodable>(_ input: Input, to type: Output.Type) throws -> Output {
         let data = try makeEncoder().encode(input)
         return try makeDecoder().decode(type, from: data)
