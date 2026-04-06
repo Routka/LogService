@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RoutkaBack Log API
-  version: 1.3.0
+  version: 1.0.0
   description: OpenAPI specification for ingesting and querying iOS application logs.
 
 servers:
@@ -90,6 +90,14 @@ paths:
       responses:
         '201':
           description: Logs were stored successfully.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AppLog'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/AppLog'
         '400':
           description: Invalid or unsupported payload.
           content:
@@ -252,7 +260,7 @@ components:
           oneOf:
             - type: string
               format: date-time
-              example: "2025-04-05T18:30:00Z"
+              example: "2025-04-05T18:30:00.123Z"
             - type: number
               example: 1743877800
             - type: integer
@@ -276,7 +284,61 @@ components:
           type: string
           example: "navigation"
     AppLog:
-      $ref: '#/components/schemas/CreateAppLog'
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - sessionID
+        - deviceID
+        - action
+        - creationDate
+        - appVersion
+        - deviceType
+        - region
+        - locale
+        - type
+        - category
+      properties:
+        id:
+          type: string
+          example: "log-001"
+        sessionID:
+          type: string
+          example: "session-123"
+        deviceID:
+          type: string
+          example: "device-456"
+        message:
+          type:
+            - string
+            - "null"
+          example: "User opened paywall"
+        action:
+          type: string
+          example: "paywall_opened"
+        creationDate:
+          type: string
+          format: date-time
+          description: ISO-8601 string with fractional seconds.
+          example: "2025-04-05T18:30:00.123Z"
+        appVersion:
+          type: string
+          example: "1.4.2"
+        deviceType:
+          type: string
+          example: "iPhone16,2"
+        region:
+          type: string
+          example: "US"
+        locale:
+          type: string
+          example: "en_US"
+        type:
+          type: string
+          example: "info"
+        category:
+          type: string
+          example: "navigation"
     AppDevice:
       type: object
       additionalProperties: false
