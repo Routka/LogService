@@ -285,7 +285,7 @@ public struct LogServiceClient: LogServiceClientProtocol {
 
     private static func encodeDate(_ date: Date, encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(makePlainDateFormatter().string(from: date))
+        try container.encode(makeFractionalDateFormatter().string(from: date))
     }
 
     private static func decodeFlexibleDate(from decoder: Decoder) throws -> Date {
