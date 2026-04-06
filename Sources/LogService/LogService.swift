@@ -22,6 +22,8 @@ import OpenAPIURLSession
 /// ```
 public struct LogServiceClient: LogServiceClientProtocol {
     private let underlyingClient: any APIProtocol
+    private let serverURL: URL
+    private let urlSession: URLSession
 
     /// Creates a client backed by the generated OpenAPI `Client`.
     ///
@@ -37,8 +39,11 @@ public struct LogServiceClient: LogServiceClientProtocol {
     /// ```
     public init(
         serverURL: URL = URL(string: "http://localhost:8080")!,
-        transport: any ClientTransport = URLSessionTransport()
+        transport: any ClientTransport = URLSessionTransport(),
+        urlSession: URLSession = .shared
     ) {
+        self.serverURL = serverURL
+        self.urlSession = urlSession
         self.underlyingClient = Client(
             serverURL: serverURL,
             transport: transport
@@ -48,6 +53,8 @@ public struct LogServiceClient: LogServiceClientProtocol {
     init(
         underlyingClient: any APIProtocol
     ) {
+        self.serverURL = URL(string: "http://localhost:8080")!
+        self.urlSession = .shared
         self.underlyingClient = underlyingClient
     }
 
@@ -167,38 +174,19 @@ public struct LogServiceClient: LogServiceClientProtocol {
         filter: LogsFilter,
         pagination: LogPagination = .init()
     ) async throws -> LogPage<AppLogModel> {
-        let response: Operations.ListLogs.Output
-
+        var queryItems = pagination.queryItems
         switch filter {
         case let .deviceID(deviceID):
-            response = try await underlyingClient.listLogs(
-                query: .init(
-                    limit: pagination.limit,
-                    offset: pagination.offset,
-                    deviceID: deviceID,
-                    sessionID: nil
-                )
-            )
+            queryItems.append(.init(name: "deviceID", value: deviceID))
         case let .sessionID(sessionID):
-            response = try await underlyingClient.listLogs(
-                query: .init(
-                    limit: pagination.limit,
-                    offset: pagination.offset,
-                    deviceID: nil,
-                    sessionID: sessionID
-                )
-            )
+            queryItems.append(.init(name: "sessionID", value: sessionID))
         }
 
-        switch response {
-        case let .ok(ok):
-            return try bridge(ok.body.json, to: LogPage<AppLogModel>.self)
-        case let .badRequest(badRequest):
-            let error = try bridge(badRequest.body.json, to: LogServiceErrorResponse.self)
-            throw LogServiceClientError.unexpectedStatusCode(400, reason: error.reason)
-        case let .undocumented(statusCode, _):
-            throw LogServiceClientError.unexpectedStatusCode(statusCode, reason: nil)
-        }
+        return try await fetchPage(
+            path: "/api/logs",
+            queryItems: queryItems,
+            as: LogPage<AppLogModel>.self
+        )
     }
 
     /// Fetches the known devices page from the backend.
@@ -212,19 +200,11 @@ public struct LogServiceClient: LogServiceClientProtocol {
     public func listDevices(
         pagination: LogPagination = .init()
     ) async throws -> LogPage<AppDeviceModel> {
-        let response = try await underlyingClient.listDevices(
-            query: .init(limit: pagination.limit, offset: pagination.offset)
+        try await fetchPage(
+            path: "/api/devices",
+            queryItems: pagination.queryItems,
+            as: LogPage<AppDeviceModel>.self
         )
-
-        switch response {
-        case let .ok(ok):
-            return try bridge(ok.body.json, to: LogPage<AppDeviceModel>.self)
-        case let .badRequest(badRequest):
-            let error = try bridge(badRequest.body.json, to: LogServiceErrorResponse.self)
-            throw LogServiceClientError.unexpectedStatusCode(400, reason: error.reason)
-        case let .undocumented(statusCode, _):
-            throw LogServiceClientError.unexpectedStatusCode(statusCode, reason: nil)
-        }
     }
 
     /// Fetches sessions for a specific device.
@@ -240,20 +220,50 @@ public struct LogServiceClient: LogServiceClientProtocol {
         forDeviceID deviceID: String,
         pagination: LogPagination = .init()
     ) async throws -> LogPage<AppSessionModel> {
-        let response = try await underlyingClient.listSessionsForDevice(
-            path: .init(deviceID: deviceID),
-            query: .init(limit: pagination.limit, offset: pagination.offset)
+        try await fetchPage(
+            path: "/api/devices/\(deviceID)/sessions",
+            queryItems: pagination.queryItems,
+            as: LogPage<AppSessionModel>.self
         )
+    }
 
-        switch response {
-        case let .ok(ok):
-            return try bridge(ok.body.json, to: LogPage<AppSessionModel>.self)
-        case let .badRequest(badRequest):
-            let error = try bridge(badRequest.body.json, to: LogServiceErrorResponse.self)
-            throw LogServiceClientError.unexpectedStatusCode(400, reason: error.reason)
-        case let .undocumented(statusCode, _):
-            throw LogServiceClientError.unexpectedStatusCode(statusCode, reason: nil)
+    private func fetchPage<Output: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem],
+        as type: Output.Type
+    ) async throws -> Output {
+        let requestURL = try makeURL(path: path, queryItems: queryItems)
+        let (data, response) = try await urlSession.data(from: requestURL)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw LogServiceClientError.invalidResponse
         }
+
+        switch httpResponse.statusCode {
+        case 200:
+            return try makeDecoder().decode(type, from: data)
+        case 400, 413:
+            let error = try? makeDecoder().decode(LogServiceErrorResponse.self, from: data)
+            throw LogServiceClientError.unexpectedStatusCode(httpResponse.statusCode, reason: error?.reason)
+        default:
+            throw LogServiceClientError.unexpectedStatusCode(httpResponse.statusCode, reason: nil)
+        }
+    }
+
+    private func makeURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
+        guard let baseURL = URL(string: path, relativeTo: serverURL) else {
+            throw LogServiceClientError.invalidResponse
+        }
+        guard var components = URLComponents(
+            url: baseURL,
+            resolvingAgainstBaseURL: true
+        ) else {
+            throw LogServiceClientError.invalidResponse
+        }
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
+        guard let url = components.url else {
+            throw LogServiceClientError.invalidResponse
+        }
+        return url
     }
 
     private func bridge<Input: Encodable, Output: Decodable>(_ input: Input, to type: Output.Type) throws -> Output {
@@ -315,5 +325,14 @@ public struct LogServiceClient: LogServiceClientProtocol {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
+    }
+}
+
+private extension LogPagination {
+    var queryItems: [URLQueryItem] {
+        [
+            .init(name: "limit", value: String(limit)),
+            .init(name: "offset", value: String(offset)),
+        ]
     }
 }
