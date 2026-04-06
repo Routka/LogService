@@ -14,12 +14,19 @@ public struct CustomDateTranscoder: DateTranscoder {
     public func decode(_ date: String) throws -> Date {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let parsedDate = formatter.date(from: date) else {
-            throw DecodingError.dataCorrupted(
-                .init(codingPath: [], debugDescription: "Invalid date: \(date)")
-            )
+        if let parsedDate = formatter.date(from: date) {
+            return parsedDate
+            
+        } else {
+            formatter.formatOptions = [.withInternetDateTime]
+            guard let parsedDate = formatter.date(from: date) else {
+                throw DecodingError.dataCorrupted(
+                    .init(codingPath: [], debugDescription: "Invalid date: \(date)")
+                )
+            }
+            return parsedDate
         }
-        return parsedDate
+        
     }
 }
 
